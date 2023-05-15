@@ -1,6 +1,6 @@
 # Taskiq + Aiogram
 
-[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/taskiqtaskiq-aiogram?style=for-the-badge)](https://pypi.org/project/taskiq-aiogram/)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/taskiq-aiogram?style=for-the-badge)](https://pypi.org/project/taskiq-aiogram/)
 [![PyPI](https://img.shields.io/pypi/v/taskiq-aiogram?style=for-the-badge)](https://pypi.org/project/taskiq-aiogram/)
 [![PyPI - Downloads](https://img.shields.io/pypi/dm/taskiq-aiogram?style=for-the-badge)](https://pypistats.org/packages/taskiq-aiogram)
 
