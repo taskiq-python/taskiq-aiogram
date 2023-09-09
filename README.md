@@ -6,20 +6,23 @@
 
 This repo adds integration between your aiogram application and taskiq.
 
-It runs all startup and shutdown events of your application and adds 3 dependencies,
+It runs all startup and shutdown events of your application and adds 2 dependencies,
 that you can use in your tasks.
 
-1. Executor - your executor;
-2. Dispatcher - that were used along with executor;
-3. Bot - your bot instance.
+1. Dispatcher - that were used along with executor;
+2. Bot - your bot instance.
 
 ## Usage
 
-Add an executor to your main file and make it possible to available for import.
-By default AioGram hides the way it creates executor, but since we want to use
-startup and shutdown events, you have to manually define your executor.
+Define startup and shutdown events for your dispatcher.
+We use events, because we need to identify what your bot
+wants to do on startup and shutdown.
 
-For example:
+Also, it's useful for bot developers to distinct buisness logic
+from startup of the bot.
+
+Below you'll find an example, how to integrate taskiq with your favorite
+bot framework.
 
 ```python
 import asyncio
