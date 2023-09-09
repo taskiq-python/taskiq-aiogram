@@ -49,7 +49,7 @@ repos:
         language: system
         types: [python]
         pass_filenames: false
-        args: [taskiq_aiogram]
+        args: [taskiq_aiogram, example]
 
       - id: yesqa
         name: Remove usless noqa
