@@ -22,41 +22,47 @@ startup and shutdown events, you have to manually define your executor.
 For example:
 
 ```python
-from aiogram import Bot, Dispatcher, executor
+import asyncio
+import logging
+import sys
+
+from aiogram import Bot, Dispatcher
+
 # Your taskiq broker
 from your_project.tkq import broker
 
-
-bot = Bot(token="API_TOKEN")
-
-dispatcher = Dispatcher(bot)
+dp = Dispatcher()
+bot = Bot(token="TOKEN")
 
 
-async def setup_taskiq(_: Dispatcher):
+@dp.startup()
+async def setup_taskiq(bot: Bot, *_args, **_kwargs):
     # Here we check if it's a clien-side,
     # Becuase otherwise you're going to
     # create infinite loop of startup events.
     if not broker.is_worker_process:
-        print("Setting up taskiq")
+        logging.info("Setting up taskiq")
         await broker.startup()
 
 
-async def shutdown_taskiq(_: Dispatcher):
+@dp.shutdown()
+async def shutdown_taskiq(bot: Bot, *_args, **_kwargs):
     if not broker.is_worker_process:
-        print("Shutting down taskiq")
+        logging.info("Shutting down taskiq")
         await broker.shutdown()
 
-# Here we defined our executor.
-bot_executor = executor.Executor(dispatcher=dispatcher)
-bot_executor.on_startup([setup_taskiq])
-bot_executor.on_shutdown([shutdown_taskiq])
+
+async def main():
+    await dp.start_polling(bot)
+
 
 if __name__ == "__main__":
-    bot_executor.start_polling()
+    logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+    asyncio.run(main())
 
 ```
 
-The only thing that left is to add one line to your broker definition.
+The only thing that left is to add few lines to your broker definition.
 
 
 ```python
@@ -69,39 +75,53 @@ broker = MyBroker()
 # This line is going to initialize everything.
 taskiq_aiogram.init(
     broker,
-    # Here we define path to your executor.
-    # This format is similar to uvicorn or gunicorn.
-    "your_project.__main__:bot_executor",
-    pooling=True,
-    webhook=False,
+    "your_project.__main__:dp",
+    "your_project.__main__:bot",
 )
 ```
 
-Aiogram defines startup events for pooling and webhooks separately. So you need to
-explicitly specify which mode suites you. BTW, by default aiogram adds handler events to
-both, so setting only pooling to True should be enought for almost any case.
-
 That's it.
 
-Let's create some tasks!
+Let's create some tasks! I created task in a separate module,
+named `tasks.py`.
 
 ```python
-# Sometimes python imports wrong task names.
-# If that happens, please set a task_name explicitly.
+from aiogram import Bot
+from your_project.tkq import broker
+
 @broker.task(task_name="my_task")
 async def my_task(chat_id: int, bot: Bot = TaskiqDepends()) -> None:
     print("I'm a task")
     await asyncio.sleep(4)
     await bot.send_message(chat_id, "task completed")
 
+```
 
-@dispatcher.message_handler(commands=["task"])
-async def send_task(message: types.Message):
-    await message.reply("Sending a task")
+Now let's call our new task somewhere in bot commands.
+
+```python
+from aiogram import types
+from aiogram.filters import Command
+
+from tasks import my_task
+
+
+@dp.message(Command("task"))
+async def message(message: types.Message):
     await my_task.kiq(message.chat.id)
 
 ```
 
-And it works!
+To start the worker, please type:
+
+```
+taskiq worker your_project.tkq:broker --fs-discover
+```
+
+We use `--fs-discover` to find all tasks.py modules recursively
+and import all tasks into broker.
+
+
+Now we can fire the task and see everything in action.
 
 ![Showcase.jpg](https://raw.githubusercontent.com/taskiq-python/taskiq-aiogram/master/imgs/showcase.jpg)

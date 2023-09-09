@@ -1,69 +1,106 @@
-from typing import Awaitable, Callable
+import logging
+from typing import Any, Awaitable, Callable
 
-from aiogram import Bot, Dispatcher, executor
+from aiogram import Bot, Dispatcher
 from taskiq import AsyncBroker, TaskiqEvents, TaskiqState
 from taskiq.cli.utils import import_object
 
-POOLING_MODE_KEY = "aiogram_pooling_mode"
-WEBHOOK_MODE_KEY = "aiogram_webhook_mode"
-EXECUTOR_KEY = "aiogram_executor"
+BOT_KEY = "aiogram_bots"
+WORKFLOW_KEY = "aiogram_workflow"
+DISPATCHER_KEY = "aiogram_dispatcher"
+
+logger = logging.getLogger("taskiq.taskiq_aiogram")
 
 
 def startup_event_generator(
     broker: AsyncBroker,
-    user_executor: executor.Executor,
-    pooling: bool,
-    webhook: bool,
+    dispatcher_path: str,
+    bot_path: str,
+    **kwargs: str,
 ) -> Callable[[TaskiqState], Awaitable[None]]:
     """
     Generate startup event for broker.
 
     :param broker: current broker.
-    :param user_executor: imported executor.
-    :param pooling: pooling mode enabled.
-    :param webhook: webhook mode enabled.
-    :return: callable event handler.
+    :param dispatcher_path: python-path to the dispatcher object.
+    :param bot_path: python-path to the bot.
+    :param kwargs: random key-word arguments.
+
+    :returns: startup event handler.
     """
 
     async def startup(state: TaskiqState) -> None:
-        user_executor.skip_updates = False
-        if pooling:
-            await user_executor._startup_polling()
-        if webhook:
-            await user_executor._startup_webhook()
+        if not broker.is_worker_process:
+            return
+
+        dispatcher = import_object(dispatcher_path)
+        if not isinstance(dispatcher, Dispatcher):
+            raise ValueError("Dispatcher should be an instance of dispatcher.")
+        bot = import_object(bot_path)
+        if not isinstance(bot, Bot):
+            raise ValueError("Bots should be instances of Bot class.")
+
+        workflow_data = {
+            "dispatcher": dispatcher,
+            "bots": [bot],
+            **dispatcher.workflow_data,
+            **kwargs,
+        }
+        if "bot" in workflow_data:
+            workflow_data.pop("bot")
+
+        state[BOT_KEY] = bot
+        state[WORKFLOW_KEY] = workflow_data
+        state[DISPATCHER_KEY] = dispatcher
+
+        await dispatcher.emit_startup(bot=bot, **workflow_data)
 
         broker.add_dependency_context(
             {
-                executor.Executor: user_executor,
-                Dispatcher: user_executor.dispatcher,
-                Bot: user_executor.dispatcher.bot,
+                Dispatcher: dispatcher,
+                Bot: bot,
             },
         )
-        state[EXECUTOR_KEY] = user_executor
-        state[POOLING_MODE_KEY] = user_executor
-        state[WEBHOOK_MODE_KEY] = user_executor
 
     return startup
 
 
-async def shutdown(state: TaskiqState) -> None:
+def shutdown_event_generator(
+    broker: AsyncBroker,
+) -> Callable[[TaskiqState], Awaitable[None]]:
     """
-    This function is used to shutdown broker properly.
+    Generate shutdown event for broker.
 
-    :param state: current state.
+    This function doesn't take any parameters,
+    except broker,
+    because all needed information for shutdown
+    can be obtained from the state.
+
+    :param broker: current broker.
+
+    :returns: shutdown event handler.
     """
-    user_executor: "executor.Executor" = state["aiogram_executor"]
-    if state[POOLING_MODE_KEY]:
-        await user_executor._shutdown_polling()
-    if state[WEBHOOK_MODE_KEY]:
-        await user_executor._shutdown_polling()
+
+    async def shutdown(state: TaskiqState) -> None:
+        if not broker.is_worker_process:
+            return
+        bot: Bot = state[BOT_KEY]
+        workflow_data: dict[str, Any] = state[WORKFLOW_KEY]
+        dispatcher: Dispatcher = state[DISPATCHER_KEY]
+
+        try:
+            await dispatcher.emit_shutdown(bot, **workflow_data)
+        except Exception as exc:
+            logger.warn(f"Error found while shutting down: {exc}")
+
+    return shutdown
 
 
 def init(
     broker: AsyncBroker,
-    executor_path: str,
-    pooling: bool = True,
-    webhook: bool = False,
+    dispatcher: str,
+    bot: str,
+    **kwargs: Any,
 ) -> None:
     """
     Initialize taskiq broker.
@@ -77,28 +114,20 @@ def init(
     using TaskiqDepends.
 
     :param broker: current broker.
-    :param executor_path: path to your executor.
-    :param pooling: whether you want to start a bot in pooling mode.
-    :param webhook: whether you want to start a bot in webhook mode.
-    :raises ValueError: raised if you passed a path not to an executor object.
+    :param dispatcher: python-path to the dispatcher.
+    :param bot: bot to use.
+    :param kwargs: random key-word arguments for shutdown and startup events.
     """
-    if not broker.is_worker_process:
-        return
-
-    user_executor = import_object(executor_path)
-    if not isinstance(user_executor, executor.Executor):
-        raise ValueError(f"{executor_path} is not an Executor instance.")
-
     broker.add_event_handler(
         TaskiqEvents.WORKER_STARTUP,
         startup_event_generator(
             broker,
-            user_executor,
-            pooling,
-            webhook,
+            dispatcher,
+            bot,
+            **kwargs,
         ),
     )
     broker.add_event_handler(
         TaskiqEvents.WORKER_SHUTDOWN,
-        shutdown,
+        shutdown_event_generator(broker),
     )
