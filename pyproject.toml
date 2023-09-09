@@ -3,7 +3,7 @@ name = "taskiq-aiogram"
 description = "Taskiq integration with Aiogram"
 authors = ["Taskiq team <taskiq@no-reply.com>"]
 maintainers = ["Taskiq team <taskiq@no-reply.com>"]
-version = "0.2.0"
+version = "0.3.0"
 readme = "README.md"
 license = "LICENSE"
 classifiers = [
@@ -26,7 +26,7 @@ packages = [{ include = "taskiq_aiogram" }]
 [tool.poetry.dependencies]
 python = "^3.8.1"
 taskiq = "^0"
-aiogram = "^2"
+aiogram = "^3"
 
 [tool.poetry.group.dev.dependencies]
 flake8 = "^6"
