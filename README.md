@@ -58,7 +58,7 @@ async def shutdown_taskiq(bot: Bot, *_args, **_kwargs):
 
 
 async def main():
-    await dp.start_polling(bot)
+    await dp.start_polling(bot, bot2)
 
 
 if __name__ == "__main__":
