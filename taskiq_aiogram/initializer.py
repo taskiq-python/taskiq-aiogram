@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Awaitable, Callable
+from typing import Any, Awaitable, Callable, List
 
 from aiogram import Bot, Dispatcher
 from taskiq import AsyncBroker, TaskiqEvents, TaskiqState
@@ -12,10 +12,10 @@ DISPATCHER_KEY = "aiogram_dispatcher"
 logger = logging.getLogger("taskiq.taskiq_aiogram")
 
 
-def startup_event_generator(
+def startup_event_generator(  # noqa: C901
     broker: AsyncBroker,
     dispatcher_path: str,
-    bot_path: str,
+    *bots_paths: str,
     **kwargs: str,
 ) -> Callable[[TaskiqState], Awaitable[None]]:
     """
@@ -23,7 +23,7 @@ def startup_event_generator(
 
     :param broker: current broker.
     :param dispatcher_path: python-path to the dispatcher object.
-    :param bot_path: python-path to the bot.
+    :param bots_paths: python-paths to bots objects.
     :param kwargs: random key-word arguments.
 
     :returns: startup event handler.
@@ -36,29 +36,33 @@ def startup_event_generator(
         dispatcher = import_object(dispatcher_path)
         if not isinstance(dispatcher, Dispatcher):
             raise ValueError("Dispatcher should be an instance of dispatcher.")
-        bot = import_object(bot_path)
-        if not isinstance(bot, Bot):
-            raise ValueError("Bots should be instances of Bot class.")
+        bots = []
+        for bot_path in bots_paths:
+            bot = import_object(bot_path)
+            if not isinstance(bot, Bot):
+                raise ValueError("Bots should be instances of Bot class.")
+            bots.append(bot)
 
         workflow_data = {
             "dispatcher": dispatcher,
-            "bots": [bot],
+            "bots": bots,
             **dispatcher.workflow_data,
             **kwargs,
         }
         if "bot" in workflow_data:
             workflow_data.pop("bot")
 
-        state[BOT_KEY] = bot
+        state[BOT_KEY] = bots
         state[WORKFLOW_KEY] = workflow_data
         state[DISPATCHER_KEY] = dispatcher
 
-        await dispatcher.emit_startup(bot=bot, **workflow_data)
+        await dispatcher.emit_startup(bot=bots[-1], **workflow_data)
 
         broker.add_dependency_context(
             {
                 Dispatcher: dispatcher,
-                Bot: bot,
+                Bot: bots[-1],
+                List[Bot]: bots,
             },
         )
 
@@ -84,12 +88,12 @@ def shutdown_event_generator(
     async def shutdown(state: TaskiqState) -> None:
         if not broker.is_worker_process:
             return
-        bot: Bot = state[BOT_KEY]
+        bots: List[Bot] = state[BOT_KEY]
         workflow_data: dict[str, Any] = state[WORKFLOW_KEY]
         dispatcher: Dispatcher = state[DISPATCHER_KEY]
 
         try:
-            await dispatcher.emit_shutdown(bot, **workflow_data)
+            await dispatcher.emit_shutdown(bots[-1], **workflow_data)
         except Exception as exc:
             logger.warn(f"Error found while shutting down: {exc}")
 
@@ -100,6 +104,7 @@ def init(
     broker: AsyncBroker,
     dispatcher: str,
     bot: str,
+    *other_bots: str,
     **kwargs: Any,
 ) -> None:
     """
@@ -116,6 +121,7 @@ def init(
     :param broker: current broker.
     :param dispatcher: python-path to the dispatcher.
     :param bot: bot to use.
+    :param other_bots: python-paths to other bots.
     :param kwargs: random key-word arguments for shutdown and startup events.
     """
     broker.add_event_handler(
@@ -124,6 +130,7 @@ def init(
             broker,
             dispatcher,
             bot,
+            *other_bots,
             **kwargs,
         ),
     )
