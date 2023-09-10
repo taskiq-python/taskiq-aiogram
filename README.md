@@ -6,11 +6,12 @@
 
 This repo adds integration between your aiogram application and taskiq.
 
-It runs all startup and shutdown events of your application and adds 2 dependencies,
+It runs all startup and shutdown events of your application and adds 3 dependencies,
 that you can use in your tasks.
 
-1. Dispatcher - that were used along with executor;
-2. Bot - your bot instance.
+1. `Dispatcher` - that were used along with executor;
+2. `Bot` - your main bot instance;
+3. `List[Bot]` - all your bots.
 
 ## Usage
 
@@ -36,6 +37,7 @@ from your_project.tkq import broker
 
 dp = Dispatcher()
 bot = Bot(token="TOKEN")
+bot2 = Bot(token="TOKEN")
 
 
 @dp.startup()
@@ -80,6 +82,7 @@ taskiq_aiogram.init(
     broker,
     "your_project.__main__:dp",
     "your_project.__main__:bot",
+    "your_project.__main__:bot2",
 )
 ```
 
