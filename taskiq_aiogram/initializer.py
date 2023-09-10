@@ -61,7 +61,7 @@ def startup_event_generator(  # noqa: C901
         broker.add_dependency_context(
             {
                 Dispatcher: dispatcher,
-                Bot: bots[0],
+                Bot: bots[-1],
                 List[Bot]: bots,
             },
         )
@@ -93,7 +93,7 @@ def shutdown_event_generator(
         dispatcher: Dispatcher = state[DISPATCHER_KEY]
 
         try:
-            await dispatcher.emit_shutdown(bots[0], **workflow_data)
+            await dispatcher.emit_shutdown(bots[-1], **workflow_data)
         except Exception as exc:
             logger.warn(f"Error found while shutting down: {exc}")
 
