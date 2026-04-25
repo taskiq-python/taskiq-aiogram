@@ -1,11 +1,17 @@
-[tool.poetry]
+[project]
 name = "taskiq-aiogram"
-description = "Taskiq integration with Aiogram"
-authors = ["Taskiq team <taskiq@no-reply.com>"]
-maintainers = ["Taskiq team <taskiq@no-reply.com>"]
 version = "0.3.1"
+description = "Taskiq integration with Aiogram"
 readme = "README.md"
-license = "LICENSE"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Taskiq team", email = "taskiq@no-reply.com" }
+]
+maintainers = [
+    { name = "Taskiq team", email = "taskiq@no-reply.com" }
+]
+keywords = ["taskiq", "tasks", "distributed", "async"]
 classifiers = [
     "Typing :: Typed",
     "Programming Language :: Python",
@@ -15,18 +21,26 @@ classifiers = [
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Operating System :: OS Independent",
     "Intended Audience :: Developers",
     "Topic :: System :: Networking",
     "Development Status :: 3 - Alpha",
 ]
-keywords = ["taskiq", "tasks", "distributed", "async"]
-packages = [{ include = "taskiq_aiogram" }]
+requires-python = ">=3.8.1,<4.0"
+dependencies = [
+    "taskiq>=0,<1",
+    "aiogram>=3,<4",
+]
 
-[tool.poetry.dependencies]
-python = "^3.8.1"
-taskiq = "^0"
-aiogram = "^3"
+[project.urls]
+Homepage = "https://github.com/taskiq-python/taskiq-aiogram"
+Repository = "https://github.com/taskiq-python/taskiq-aiogram"
+
+[tool.poetry]
+packages = [{ include = "taskiq_aiogram" }]
 
 [tool.poetry.group.dev.dependencies]
 flake8 = "^6"
